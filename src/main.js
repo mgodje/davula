@@ -265,11 +265,13 @@ function checkDrumRayHits() {
       playSound(centerSound);
       console.log("CENTER ray hit");
     } else if (normalizedDistance < 0.72) {
-      playSound(middleSound);
-      console.log("MIDDLE ray hit");
-    } else {
+      // was middle, now rim
       playSound(rimSound);
       console.log("RIM ray hit");
+    } else {
+      // was rim, now middle
+      playSound(middleSound);
+      console.log("MIDDLE ray hit");
     }
 
     lastTriggerTime = now;
