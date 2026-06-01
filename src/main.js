@@ -104,8 +104,16 @@ loader.load(`${import.meta.env.BASE_URL}models/Davula.glb`, (gltf) => {
   // hard code to sit on floor
   model.position.y += 2;
 
-  scene.add(model);
-});
+  scene.add(model); 
+
+  console.log("GLB loaded successfully", gltf);
+  },
+  
+  undefined,
+  (error) => {
+    console.error("GLB failed to load:", error);
+  }
+);
 
 // VR movement
 const clock = new THREE.Clock();
