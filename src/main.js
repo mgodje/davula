@@ -5,7 +5,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xffffff);
+scene.background = new THREE.Color(0x88ccff);
 
 const camera = new THREE.PerspectiveCamera(
   60,
@@ -20,8 +20,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
 
-document.body.appendChild(renderer.domElement);
-document.body.appendChild(VRButton.createButton(renderer));
+document.querySelector("#app").appendChild(renderer.domElement);
+document.querySelector("#app").appendChild(VRButton.createButton(renderer));
 
 const player = new THREE.Group();
 player.add(camera);
@@ -90,7 +90,7 @@ player.add(controllerGrip2);
 // Load drum
 const loader = new GLTFLoader();
 
-loader.load("./models/Davula.glb", (gltf) => {
+loader.load(`${import.meta.env.BASE_URL}models/Davula.glb`, (gltf) => {
   const model = gltf.scene;
 
   model.scale.setScalar(10);
