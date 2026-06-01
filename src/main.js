@@ -9,6 +9,12 @@ let drumCenter = new THREE.Vector3();
 let drumRadius = 1.5;
 let lastHitTime = 0;
 
+let drumModel = null;
+let lastTriggerTime = 0;
+
+const raycaster = new THREE.Raycaster();
+const tempMatrix = new THREE.Matrix4();
+
 const centerSound = new Audio(`${import.meta.env.BASE_URL}audio/Center.m4a`);
 const middleSound = new Audio(`${import.meta.env.BASE_URL}audio/Middle.m4a`);
 const rimSound = new Audio(`${import.meta.env.BASE_URL}audio/Rim.m4a`);
@@ -101,10 +107,30 @@ const controllerGrip2 = renderer.xr.getControllerGrip(1);
 controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
 player.add(controllerGrip2);
 
+// raycasting
+function createControllerRay() {
+  const geometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0, 0, -5)
+  ]);
+
+  const material = new THREE.LineBasicMaterial({
+    color: 0x000000
+  });
+
+  const line = new THREE.Line(geometry, material);
+  line.name = "ray";
+  line.scale.z = 1;
+
+  return line;
+}
+
 const controller1 = renderer.xr.getController(0);
+controller1.add(createControllerRay());
 player.add(controller1);
 
 const controller2 = renderer.xr.getController(1);
+controller2.add(createControllerRay());
 player.add(controller2);
 
 // Load drum
@@ -137,7 +163,8 @@ loader.load(`${import.meta.env.BASE_URL}models/Davula.glb`, (gltf) => {
   console.log("Drum top Y:", drumTopY);
   console.log("Drum radius:", drumRadius);
 
-  scene.add(model); 
+  drumModel = model;
+  scene.add(model);
 
   console.log("GLB loaded successfully", gltf);
   },
@@ -195,14 +222,13 @@ function movePlayer(delta) {
   }
 }
 
-function checkDrumHits() {
+function checkDrumRayHits() {
+  if (!drumModel) return;
+
   const session = renderer.xr.getSession();
   if (!session) return;
 
   const now = performance.now();
-
-  // prevents machine-gun triggering
-  if (now - lastHitTime < 250) return;
 
   for (const source of session.inputSources) {
     if (!source.gamepad) continue;
@@ -210,35 +236,43 @@ function checkDrumHits() {
     const controllerIndex = source.handedness === "left" ? 0 : 1;
     const controller = renderer.xr.getController(controllerIndex);
 
-    const controllerPos = new THREE.Vector3();
-    controller.getWorldPosition(controllerPos);
+    const trigger = source.gamepad.buttons[0];
 
-    const verticalDistance = Math.abs(controllerPos.y - drumTopY);
+    if (!trigger || !trigger.pressed) continue;
 
-    // controller must be near drum head height
-    if (verticalDistance > 0.15) continue;
+    // prevent repeated rapid-fire while holding trigger
+    if (now - lastTriggerTime < 250) continue;
 
-    const dx = controllerPos.x - drumCenter.x;
-    const dz = controllerPos.z - drumCenter.z;
+    tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+    raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+    const hits = raycaster.intersectObject(drumModel, true);
+
+    if (hits.length === 0) continue;
+
+    const hit = hits[0];
+    const point = hit.point;
+
+    const dx = point.x - drumCenter.x;
+    const dz = point.z - drumCenter.z;
     const distanceFromCenter = Math.sqrt(dx * dx + dz * dz);
-
-    // outside drum
-    if (distanceFromCenter > drumRadius) continue;
 
     const normalizedDistance = distanceFromCenter / drumRadius;
 
     if (normalizedDistance < 0.33) {
       playSound(centerSound);
-      console.log("CENTER hit");
+      console.log("CENTER ray hit");
     } else if (normalizedDistance < 0.72) {
       playSound(middleSound);
-      console.log("MIDDLE hit");
+      console.log("MIDDLE ray hit");
     } else {
       playSound(rimSound);
-      console.log("RIM hit");
+      console.log("RIM ray hit");
     }
 
-    lastHitTime = now;
+    lastTriggerTime = now;
   }
 }
 
@@ -247,7 +281,7 @@ renderer.setAnimationLoop(() => {
 
   controls.update();
   movePlayer(delta);
-  checkDrumHits();
+  checkDrumRayHits();
 
   renderer.render(scene, camera);
 });
