@@ -5,7 +5,7 @@ import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x202025);
+scene.background = new THREE.Color(0xffffff);
 
 const camera = new THREE.PerspectiveCamera(
   60,
@@ -31,15 +31,50 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 1, 0);
 controls.update();
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+// white room
+const roomMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffffff,
+  side: THREE.BackSide
+});
 
-const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(5, 10, 5);
-scene.add(light);
+const room = new THREE.Mesh(
+  new THREE.BoxGeometry(20, 10, 20),
+  roomMaterial
+);
 
-const grid = new THREE.GridHelper(10, 10);
-grid.position.y = 0;
-scene.add(grid);
+// lift room slightly to stop z-fighting with floor
+room.position.y = 4.99;
+
+scene.add(room);
+
+// lighting
+scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 2);
+keyLight.position.set(5, 8, 5);
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0xffffff, 1);
+fillLight.position.set(-5, 4, -5);
+scene.add(fillLight);
+
+// Floor
+const floorGeometry = new THREE.PlaneGeometry(20, 20);
+
+const floorMaterial = new THREE.MeshStandardMaterial({
+  color: 0xe5e5e5,
+  roughness: 0.9,
+  metalness: 0.0
+});
+
+const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = 0;
+
+floor.receiveShadow = true;
+
+scene.add(floor);
 
 // Controller visuals
 const controllerModelFactory = new XRControllerModelFactory();
@@ -62,13 +97,14 @@ loader.load("/models/Davula.glb", (gltf) => {
 
   const box = new THREE.Box3().setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+
   model.position.sub(center);
 
+  // hard code to sit on floor
   model.position.y += 2;
 
   scene.add(model);
-
-  console.log("GLB loaded", gltf);
 });
 
 // VR movement
