@@ -90,7 +90,7 @@ player.add(controllerGrip2);
 // Load drum
 const loader = new GLTFLoader();
 
-loader.load("/models/Davula.glb", (gltf) => {
+loader.load("./models/Davula.glb", (gltf) => {
   const model = gltf.scene;
 
   model.scale.setScalar(10);
