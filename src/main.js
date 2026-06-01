@@ -4,6 +4,20 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 
+let drumTopY = 0;
+let drumCenter = new THREE.Vector3();
+let drumRadius = 1.5;
+let lastHitTime = 0;
+
+const centerSound = new Audio(`${import.meta.env.BASE_URL}audio/Center.m4a`);
+const middleSound = new Audio(`${import.meta.env.BASE_URL}audio/Middle.m4a`);
+const rimSound = new Audio(`${import.meta.env.BASE_URL}audio/Rim.m4a`);
+
+function playSound(sound) {
+  sound.currentTime = 0;
+  sound.play();
+}
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x88ccfF);
 
@@ -14,7 +28,7 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 
-camera.position.set(0, 1.6, 4);
+camera.position.set(0, 3.0, 4);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -87,6 +101,12 @@ const controllerGrip2 = renderer.xr.getControllerGrip(1);
 controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
 player.add(controllerGrip2);
 
+const controller1 = renderer.xr.getController(0);
+player.add(controller1);
+
+const controller2 = renderer.xr.getController(1);
+player.add(controller2);
+
 // Load drum
 const loader = new GLTFLoader();
 
@@ -103,6 +123,19 @@ loader.load(`${import.meta.env.BASE_URL}models/Davula.glb`, (gltf) => {
 
   // hard code to sit on floor
   model.position.y += 2;
+
+  const finalBox = new THREE.Box3().setFromObject(model);
+  const finalSize = finalBox.getSize(new THREE.Vector3());
+
+  drumCenter = finalBox.getCenter(new THREE.Vector3());
+  drumTopY = finalBox.max.y;
+
+  // Approximate radius from model width/depth
+  drumRadius = Math.max(finalSize.x, finalSize.z) * 0.5;
+
+  console.log("Drum center:", drumCenter);
+  console.log("Drum top Y:", drumTopY);
+  console.log("Drum radius:", drumRadius);
 
   scene.add(model); 
 
@@ -153,9 +186,59 @@ function movePlayer(delta) {
     }
 
     if (handedness === "right") {
-      // Right thumbstick: smooth turn
-      player.rotation.y -= x * turnSpeed * delta;
+    // Right thumbstick X: rotate
+    player.rotation.y -= x * turnSpeed * delta;
+
+    // Right thumbstick Y: move up/down
+    player.position.y += -y * moveSpeed * delta;
     }
+  }
+}
+
+function checkDrumHits() {
+  const session = renderer.xr.getSession();
+  if (!session) return;
+
+  const now = performance.now();
+
+  // prevents machine-gun triggering
+  if (now - lastHitTime < 250) return;
+
+  for (const source of session.inputSources) {
+    if (!source.gamepad) continue;
+
+    const controllerIndex = source.handedness === "left" ? 0 : 1;
+    const controller = renderer.xr.getController(controllerIndex);
+
+    const controllerPos = new THREE.Vector3();
+    controller.getWorldPosition(controllerPos);
+
+    const verticalDistance = Math.abs(controllerPos.y - drumTopY);
+
+    // controller must be near drum head height
+    if (verticalDistance > 0.15) continue;
+
+    const dx = controllerPos.x - drumCenter.x;
+    const dz = controllerPos.z - drumCenter.z;
+    const distanceFromCenter = Math.sqrt(dx * dx + dz * dz);
+
+    // outside drum
+    if (distanceFromCenter > drumRadius) continue;
+
+    const normalizedDistance = distanceFromCenter / drumRadius;
+
+    if (normalizedDistance < 0.33) {
+      playSound(centerSound);
+      console.log("CENTER hit");
+    } else if (normalizedDistance < 0.72) {
+      playSound(middleSound);
+      console.log("MIDDLE hit");
+    } else {
+      playSound(rimSound);
+      console.log("RIM hit");
+    }
+
+    lastHitTime = now;
   }
 }
 
@@ -164,6 +247,7 @@ renderer.setAnimationLoop(() => {
 
   controls.update();
   movePlayer(delta);
+  checkDrumHits();
 
   renderer.render(scene, camera);
 });
