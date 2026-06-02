@@ -249,8 +249,11 @@ loader.load(
     let box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
 
-    model.position.x -= center.x;
+  model.position.x -= center.x;
+
+    // move drum 4 meters in front of player
     model.position.z -= center.z;
+    model.position.z -= 8;
 
     box = new THREE.Box3().setFromObject(model);
     model.position.y += 0.01 - box.min.y;
