@@ -379,6 +379,7 @@ function checkIntroContinue() {
     const trigger = source.gamepad.buttons[0];
 
     if (trigger && trigger.pressed) {
+      lastTriggerTime = performance.now();
       experienceStarted = true;
       controlsEnabled = true;
 
@@ -484,8 +485,14 @@ renderer.setAnimationLoop(() => {
   const delta = clock.getDelta();
 
   controls.update();
+
+  if (!experienceStarted) {
+    checkIntroContinue();
+    renderer.render(scene, camera);
+    return;
+  }
+
   movePlayer(delta);
-  checkIntroContinue();
   checkDrumRayHits();
 
   renderer.render(scene, camera);
