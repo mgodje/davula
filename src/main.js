@@ -14,7 +14,6 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 
-// Spawn in front of where the drum will be
 camera.position.set(0, 1.8, 6);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -32,10 +31,9 @@ player.add(camera);
 scene.add(player);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1, 0);
+controls.target.set(0, 1, -8);
 controls.update();
 
-// Black room
 const roomMaterial = new THREE.MeshStandardMaterial({
   color: 0x000000,
   roughness: 1,
@@ -51,10 +49,8 @@ const room = new THREE.Mesh(
 room.position.y = 4.99;
 scene.add(room);
 
-// Very low ambient so room is dark but not impossible to see
 scene.add(new THREE.AmbientLight(0xffffff, 0.05));
 
-// Black floor
 const floorGeometry = new THREE.PlaneGeometry(20, 20);
 
 const floorMaterial = new THREE.MeshStandardMaterial({
@@ -68,7 +64,6 @@ floor.rotation.x = -Math.PI / 2;
 floor.position.y = 0.01;
 scene.add(floor);
 
-// Audio
 const centerSound = new Audio(`${import.meta.env.BASE_URL}audio/Center.m4a`);
 const middleSound = new Audio(`${import.meta.env.BASE_URL}audio/Middle.m4a`);
 const rimSound = new Audio(`${import.meta.env.BASE_URL}audio/Rim.m4a`);
@@ -88,6 +83,7 @@ let introPanel = null;
 let canContinue = false;
 let experienceStarted = false;
 let introCreated = false;
+let controlsEnabled = false;
 
 const raycaster = new THREE.Raycaster();
 const tempMatrix = new THREE.Matrix4();
@@ -219,9 +215,7 @@ function createIntroPanel() {
   const geometry = new THREE.PlaneGeometry(4.2, 2.4);
   introPanel = new THREE.Mesh(geometry, material);
 
-  // Panel sits directly in front of the user's VR camera
   introPanel.position.set(0, 0, -3);
-
   camera.add(introPanel);
 }
 
@@ -249,16 +243,15 @@ loader.load(
     let box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
 
-  model.position.x -= center.x;
-
-    // move drum 4 meters in front of player
+    model.position.x -= center.x;
     model.position.z -= center.z;
+
+    // Move drum 8 meters in front of the starting player/camera
     model.position.z -= 8;
 
     box = new THREE.Box3().setFromObject(model);
     model.position.y += 0.01 - box.min.y;
 
-    // Make drum emit light visually
     model.traverse((child) => {
       if (child.isMesh && child.material) {
         const oldMaterial = child.material;
@@ -289,14 +282,12 @@ loader.load(
 
     scene.add(model);
 
-    // Actual light coming from the drum
     const drumLight = new THREE.PointLight(0xaaccff, 5, 12, 2);
     drumLight.position.copy(drumCenter);
     drumLight.position.y += finalSize.y * 0.35;
     drumLight.visible = false;
     scene.add(drumLight);
 
-    // Soft top glow
     const topLight = new THREE.PointLight(0xaaccff, 2.5, 8, 2);
     topLight.position.copy(drumCenter);
     topLight.position.y = drumTopY + 0.5;
@@ -305,6 +296,23 @@ loader.load(
 
     drumModel.userData.drumLight = drumLight;
     drumModel.userData.topLight = topLight;
+
+    setTimeout(() => {
+      if (!renderer.xr.getSession() && drumModel) {
+        drumModel.visible = true;
+
+        if (drumModel.userData.drumLight) {
+          drumModel.userData.drumLight.visible = true;
+        }
+
+        if (drumModel.userData.topLight) {
+          drumModel.userData.topLight.visible = true;
+        }
+
+        experienceStarted = true;
+        controlsEnabled = true;
+      }
+    }, 1000);
 
     console.log("GLB loaded successfully", gltf);
   },
@@ -325,6 +333,7 @@ function applyDeadzone(value) {
 
 function movePlayer(delta) {
   if (!experienceStarted) return;
+  if (!controlsEnabled) return;
 
   const session = renderer.xr.getSession();
   if (!session) return;
@@ -347,7 +356,7 @@ function movePlayer(delta) {
       const right = new THREE.Vector3();
       right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
 
-      player.position.addScaledVector(forward, -y * moveSpeed * delta);
+      player.position.addScaledVector(forward, y * moveSpeed * delta);
       player.position.addScaledVector(right, x * moveSpeed * delta);
     }
 
@@ -371,6 +380,7 @@ function checkIntroContinue() {
 
     if (trigger && trigger.pressed) {
       experienceStarted = true;
+      controlsEnabled = true;
 
       if (introPanel) {
         camera.remove(introPanel);
@@ -460,8 +470,14 @@ function checkDrumRayHits() {
 }
 
 renderer.xr.addEventListener("sessionstart", () => {
-  // Start the intro only after entering VR
+  controlsEnabled = false;
   startIntroTimerOnce();
+
+  setTimeout(() => {
+    if (experienceStarted) {
+      controlsEnabled = true;
+    }
+  }, 1000);
 });
 
 renderer.setAnimationLoop(() => {
