@@ -356,7 +356,7 @@ function movePlayer(delta) {
       const right = new THREE.Vector3();
       right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
 
-      player.position.addScaledVector(forward, y * moveSpeed * delta);
+      player.position.addScaledVector(forward, -y * moveSpeed * delta);
       player.position.addScaledVector(right, x * moveSpeed * delta);
     }
 
