@@ -4,17 +4,6 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 
-const intro = document.querySelector("#intro");
-const enterButton = document.querySelector("#enterButton");
-
-setTimeout(() => {
-  enterButton.style.display = "inline-block";
-}, 10000);
-
-enterButton.addEventListener("click", () => {
-  intro.style.display = "none";
-});
-
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
@@ -25,7 +14,8 @@ const camera = new THREE.PerspectiveCamera(
   1000
 );
 
-camera.position.set(0, 3.0, 4);
+// Spawn in front of where the drum will be
+camera.position.set(0, 1.8, 6);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -94,6 +84,11 @@ let drumCenter = new THREE.Vector3();
 let drumRadius = 1.5;
 let lastTriggerTime = 0;
 
+let introPanel = null;
+let canContinue = false;
+let experienceStarted = false;
+let introCreated = false;
+
 const raycaster = new THREE.Raycaster();
 const tempMatrix = new THREE.Matrix4();
 
@@ -127,6 +122,120 @@ player.add(controllerGrip1);
 const controllerGrip2 = renderer.xr.getControllerGrip(1);
 controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
 player.add(controllerGrip2);
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split(" ");
+  let line = "";
+
+  for (let i = 0; i < words.length; i++) {
+    const testLine = line + words[i] + " ";
+    const metrics = ctx.measureText(testLine);
+    const testWidth = metrics.width;
+
+    if (testWidth > maxWidth && i > 0) {
+      ctx.fillText(line, x, y);
+      line = words[i] + " ";
+      y += lineHeight;
+    } else {
+      line = testLine;
+    }
+  }
+
+  ctx.fillText(line, x, y);
+  return y + lineHeight;
+}
+
+function createIntroPanel() {
+  if (introPanel) {
+    camera.remove(introPanel);
+
+    if (introPanel.material.map) introPanel.material.map.dispose();
+    introPanel.material.dispose();
+    introPanel.geometry.dispose();
+
+    introPanel = null;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1400;
+  canvas.height = 800;
+
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "rgba(0, 0, 0, 0.95)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "#aaccff";
+  ctx.lineWidth = 10;
+  ctx.strokeRect(30, 30, canvas.width - 60, canvas.height - 60);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+
+  ctx.font = "bold 72px Arial";
+  ctx.fillText("Davula Drum", canvas.width / 2, 120);
+
+  ctx.font = "38px Arial";
+
+  let y = 220;
+
+  y = wrapText(
+    ctx,
+    "The davula is a traditional drum used in ceremonial, cultural, and musical settings.",
+    canvas.width / 2,
+    y,
+    1100,
+    52
+  );
+
+  y += 25;
+
+  y = wrapText(
+    ctx,
+    "In this VR experience, aim your controller at the drum and press the trigger to hear different sounds from the center, middle, rim, and body.",
+    canvas.width / 2,
+    y,
+    1100,
+    52
+  );
+
+  ctx.font = "bold 42px Arial";
+  ctx.fillStyle = canContinue ? "#ffffff" : "#777777";
+  ctx.fillText(
+    canContinue ? "Press trigger to continue" : "Please read...",
+    canvas.width / 2,
+    690
+  );
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    side: THREE.DoubleSide
+  });
+
+  const geometry = new THREE.PlaneGeometry(4.2, 2.4);
+  introPanel = new THREE.Mesh(geometry, material);
+
+  // Panel sits directly in front of the user's VR camera
+  introPanel.position.set(0, 0, -3);
+
+  camera.add(introPanel);
+}
+
+function startIntroTimerOnce() {
+  if (introCreated) return;
+
+  introCreated = true;
+  createIntroPanel();
+
+  setTimeout(() => {
+    canContinue = true;
+    createIntroPanel();
+  }, 10000);
+}
 
 const loader = new GLTFLoader();
 
@@ -166,6 +275,7 @@ loader.load(
     });
 
     drumModel = model;
+    drumModel.visible = false;
 
     const finalBox = new THREE.Box3().setFromObject(model);
     const finalSize = finalBox.getSize(new THREE.Vector3());
@@ -180,13 +290,18 @@ loader.load(
     const drumLight = new THREE.PointLight(0xaaccff, 5, 12, 2);
     drumLight.position.copy(drumCenter);
     drumLight.position.y += finalSize.y * 0.35;
+    drumLight.visible = false;
     scene.add(drumLight);
 
     // Soft top glow
     const topLight = new THREE.PointLight(0xaaccff, 2.5, 8, 2);
     topLight.position.copy(drumCenter);
     topLight.position.y = drumTopY + 0.5;
+    topLight.visible = false;
     scene.add(topLight);
+
+    drumModel.userData.drumLight = drumLight;
+    drumModel.userData.topLight = topLight;
 
     console.log("GLB loaded successfully", gltf);
   },
@@ -206,6 +321,8 @@ function applyDeadzone(value) {
 }
 
 function movePlayer(delta) {
+  if (!experienceStarted) return;
+
   const session = renderer.xr.getSession();
   if (!session) return;
 
@@ -238,7 +355,50 @@ function movePlayer(delta) {
   }
 }
 
+function checkIntroContinue() {
+  if (experienceStarted || !canContinue) return;
+
+  const session = renderer.xr.getSession();
+  if (!session) return;
+
+  for (const source of session.inputSources) {
+    if (!source.gamepad) continue;
+
+    const trigger = source.gamepad.buttons[0];
+
+    if (trigger && trigger.pressed) {
+      experienceStarted = true;
+
+      if (introPanel) {
+        camera.remove(introPanel);
+
+        if (introPanel.material.map) introPanel.material.map.dispose();
+        introPanel.material.dispose();
+        introPanel.geometry.dispose();
+
+        introPanel = null;
+      }
+
+      if (drumModel) {
+        drumModel.visible = true;
+
+        if (drumModel.userData.drumLight) {
+          drumModel.userData.drumLight.visible = true;
+        }
+
+        if (drumModel.userData.topLight) {
+          drumModel.userData.topLight.visible = true;
+        }
+      }
+
+      console.log("Experience started");
+      break;
+    }
+  }
+}
+
 function checkDrumRayHits() {
+  if (!experienceStarted) return;
   if (!drumModel) return;
 
   const session = renderer.xr.getSession();
@@ -284,11 +444,11 @@ function checkDrumRayHits() {
         playSound(centerSound);
         console.log("CENTER hit");
       } else if (normalizedDistance < 0.72) {
-        playSound(rimSound);
-        console.log("RIM hit");
-      } else {
         playSound(middleSound);
         console.log("MIDDLE hit");
+      } else {
+        playSound(rimSound);
+        console.log("RIM hit");
       }
     }
 
@@ -296,11 +456,17 @@ function checkDrumRayHits() {
   }
 }
 
+renderer.xr.addEventListener("sessionstart", () => {
+  // Start the intro only after entering VR
+  startIntroTimerOnce();
+});
+
 renderer.setAnimationLoop(() => {
   const delta = clock.getDelta();
 
   controls.update();
   movePlayer(delta);
+  checkIntroContinue();
   checkDrumRayHits();
 
   renderer.render(scene, camera);
