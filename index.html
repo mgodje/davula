@@ -7,6 +7,41 @@
       body {
         margin: 0;
         overflow: hidden;
+        font-family: Arial, sans-serif;
+        background: black;
+      }
+
+      #intro {
+        position: fixed;
+        inset: 0;
+        background: black;
+        color: white;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 40px;
+      }
+
+      #intro-content {
+        max-width: 800px;
+        line-height: 1.6;
+      }
+
+      #enterButton {
+        margin-top: 30px;
+        padding: 14px 28px;
+        font-size: 18px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        display: none;
+      }
+
+      #app {
+        width: 100vw;
+        height: 100vh;
       }
 
       canvas {
@@ -14,8 +49,30 @@
       }
     </style>
   </head>
+
   <body>
+    <div id="intro">
+      <div id="intro-content">
+        <h1>Davula Drum</h1>
+
+        <p>
+          The davula is a traditional drum used in ceremonial, cultural, and
+          musical settings. In this VR experience, you can explore the drum,
+          move around it, and interact with different parts of its surface to
+          hear distinct sounds.
+        </p>
+
+        <p>
+          Aim your controller at the drum and press the trigger to play sounds
+          from the center, middle, rim, and body.
+        </p>
+
+        <button id="enterButton">Enter VR Scene</button>
+      </div>
+    </div>
+
     <div id="app"></div>
+
     <script type="module" src="./src/main.js"></script>
   </body>
 </html>

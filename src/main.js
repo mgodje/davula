@@ -4,8 +4,19 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 
+const intro = document.querySelector("#intro");
+const enterButton = document.querySelector("#enterButton");
+
+setTimeout(() => {
+  enterButton.style.display = "inline-block";
+}, 10000);
+
+enterButton.addEventListener("click", () => {
+  intro.style.display = "none";
+});
+
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xffffff);
+scene.background = new THREE.Color(0x000000);
 
 const camera = new THREE.PerspectiveCamera(
   60,
@@ -19,6 +30,9 @@ camera.position.set(0, 3.0, 4);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.4;
 
 document.querySelector("#app").appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
@@ -31,8 +45,11 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 1, 0);
 controls.update();
 
+// Black room
 const roomMaterial = new THREE.MeshStandardMaterial({
-  color: 0xffffff,
+  color: 0x000000,
+  roughness: 1,
+  metalness: 0,
   side: THREE.BackSide
 });
 
@@ -44,20 +61,14 @@ const room = new THREE.Mesh(
 room.position.y = 4.99;
 scene.add(room);
 
-scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+// Very low ambient so room is dark but not impossible to see
+scene.add(new THREE.AmbientLight(0xffffff, 0.05));
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 2);
-keyLight.position.set(5, 8, 5);
-scene.add(keyLight);
-
-const fillLight = new THREE.DirectionalLight(0xffffff, 1);
-fillLight.position.set(-5, 4, -5);
-scene.add(fillLight);
-
+// Black floor
 const floorGeometry = new THREE.PlaneGeometry(20, 20);
 
 const floorMaterial = new THREE.MeshStandardMaterial({
-  color: 0xe5e5e5,
+  color: 0x050505,
   roughness: 0.9,
   metalness: 0.0
 });
@@ -67,6 +78,7 @@ floor.rotation.x = -Math.PI / 2;
 floor.position.y = 0.01;
 scene.add(floor);
 
+// Audio
 const centerSound = new Audio(`${import.meta.env.BASE_URL}audio/Center.m4a`);
 const middleSound = new Audio(`${import.meta.env.BASE_URL}audio/Middle.m4a`);
 const rimSound = new Audio(`${import.meta.env.BASE_URL}audio/Rim.m4a`);
@@ -94,7 +106,7 @@ function createControllerRay() {
   ]);
 
   const material = new THREE.LineBasicMaterial({
-    color: 0x000000
+    color: 0xffffff
   });
 
   return new THREE.Line(geometry, material);
@@ -134,6 +146,25 @@ loader.load(
     box = new THREE.Box3().setFromObject(model);
     model.position.y += 0.01 - box.min.y;
 
+    // Make drum emit light visually
+    model.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const oldMaterial = child.material;
+
+        child.material = new THREE.MeshStandardMaterial({
+          map: oldMaterial.map || null,
+          color: oldMaterial.color || new THREE.Color(0xffffff),
+          roughness: 0.5,
+          metalness: 0.0,
+          emissive: new THREE.Color(0xaaccff),
+          emissiveIntensity: 0.9,
+          emissiveMap: oldMaterial.map || null
+        });
+
+        child.material.needsUpdate = true;
+      }
+    });
+
     drumModel = model;
 
     const finalBox = new THREE.Box3().setFromObject(model);
@@ -144,6 +175,18 @@ loader.load(
     drumRadius = Math.max(finalSize.x, finalSize.z) * 0.5;
 
     scene.add(model);
+
+    // Actual light coming from the drum
+    const drumLight = new THREE.PointLight(0xaaccff, 5, 12, 2);
+    drumLight.position.copy(drumCenter);
+    drumLight.position.y += finalSize.y * 0.35;
+    scene.add(drumLight);
+
+    // Soft top glow
+    const topLight = new THREE.PointLight(0xaaccff, 2.5, 8, 2);
+    topLight.position.copy(drumCenter);
+    topLight.position.y = drumTopY + 0.5;
+    scene.add(topLight);
 
     console.log("GLB loaded successfully", gltf);
   },
