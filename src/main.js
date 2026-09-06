@@ -4,6 +4,10 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { VRButton } from "three/addons/webxr/VRButton.js";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 
+
+// Server
+
+const LOG_SERVER_URL = "https://lemon-safari-unpopular.ngrok-free.dev";
 // ============================================================
 // SCENE
 // ============================================================
@@ -405,89 +409,66 @@ function startSimulationLog(
   );
 }
 
-function downloadSimulationLog() {
+async function sendSimulationLogToLaptop() {
 
   const payload = {
+    simulation: "Davula VR",
 
-    simulation:
-      "Davula VR",
+    startedAt: simulationStartTime
+      ? simulationStartTime.toISOString()
+      : null,
 
-    startedAt:
-      simulationStartTime
-        ? simulationStartTime
-            .toISOString()
-        : null,
+    endedAt: new Date().toISOString(),
 
-    endedAt:
-      new Date()
-        .toISOString(),
+    eventCount: simulationLog.length,
 
-    eventCount:
-      simulationLog.length,
-
-    events:
-      simulationLog
+    events: simulationLog
   };
 
   console.log(
-    "DAVULA SESSION LOG",
+    "Sending Davula session log:",
     payload
   );
 
-  const blob =
-    new Blob(
-      [
-        JSON.stringify(
-          payload,
-          null,
-          2
-        )
-      ],
+  try {
+
+    const response = await fetch(
+      LOG_SERVER_URL,
       {
-        type:
-          "application/json"
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify(payload)
       }
     );
 
-  const url =
-    URL.createObjectURL(
-      blob
+    if (!response.ok) {
+      throw new Error(
+        `Server returned ${response.status}`
+      );
+    }
+
+    const result = await response.json();
+
+    console.log(
+      "Log successfully saved on laptop:",
+      result.filename
     );
 
-  const link =
-    document.createElement(
-      "a"
+    return true;
+
+  } catch (error) {
+
+    console.error(
+      "Could not send log to laptop:",
+      error
     );
 
-  const safeTime =
-    new Date()
-      .toISOString()
-      .replace(
-        /[:.]/g,
-        "-"
-      );
-
-  link.href = url;
-
-  link.download =
-    `davula-session-${safeTime}.json`;
-
-  document.body.appendChild(
-    link
-  );
-
-  link.click();
-
-  link.remove();
-
-  setTimeout(
-    () => {
-      URL.revokeObjectURL(
-        url
-      );
-    },
-    1000
-  );
+    return false;
+  }
 }
 
 // ============================================================
@@ -806,8 +787,7 @@ function wrapText(
 
 function createPanelTexture(
   title,
-  body,
-  footer = ""
+  body
 ) {
 
   const canvas =
@@ -875,26 +855,6 @@ function createPanelTexture(
     1320,
     54
   );
-
-  if (
-    footer
-  ) {
-
-    ctx.textAlign =
-      "center";
-
-    ctx.font =
-      "bold 34px Arial";
-
-    ctx.fillStyle =
-      "#9bb8d3";
-
-    ctx.fillText(
-      footer,
-      canvas.width / 2,
-      820
-    );
-  }
 
   const texture =
     new THREE.CanvasTexture(
@@ -1040,7 +1000,6 @@ function addUIButton(
 function showUIPanel({
   title,
   body,
-  footer = "",
   buttons = []
 }) {
 
@@ -1060,8 +1019,7 @@ function showUIPanel({
       map:
         createPanelTexture(
           title,
-          body,
-          footer
+          body
         ),
 
       transparent:
@@ -1117,9 +1075,6 @@ function showStartPanel() {
     body:
       "Welcome to the Davula VR experience. Press START to begin simulation.",
 
-    footer:
-      "Aim at START with either controller and press the trigger.",
-
     buttons: [
       {
         label:
@@ -1150,11 +1105,6 @@ function showIntro1() {
       "History of the Davula",
 
     body,
-
-    footer:
-      intro1Ready
-        ? "NEXT is now available."
-        : "Please read. NEXT will appear after 5 seconds.",
 
     buttons:
       intro1Ready
@@ -1187,11 +1137,6 @@ function showIntro2() {
 
     body,
 
-    footer:
-      intro2Ready
-        ? "NEXT is now available."
-        : "Please read. NEXT will appear after 5 seconds.",
-
     buttons:
       intro2Ready
         ? [
@@ -1220,9 +1165,6 @@ function showEndConfirmation() {
 
     body:
       "Do you want to end the simulation? Choosing YES will stop interaction. Choosing NO will continue from where you left off.",
-
-    footer:
-      "Aim at a choice and press the trigger.",
 
     buttons: [
 
@@ -1272,9 +1214,6 @@ function showEndedPanel() {
 
     body:
       "The Davula VR simulation has ended.",
-
-    footer:
-      "You may now exit VR."
   });
 }
 
@@ -1616,7 +1555,7 @@ function confirmEndSimulation(
 
   showEndedPanel();
 
-  downloadSimulationLog();
+  sendSimulationLogToLaptop();
 
   simulationLogging =
     false;
