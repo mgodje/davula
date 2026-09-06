@@ -411,7 +411,6 @@ function startSimulationLog(
 }
 
 async function sendSimulationLogToLaptop() {
-
   const payload = {
     simulation: "Davula VR",
 
@@ -432,27 +431,38 @@ async function sendSimulationLogToLaptop() {
   );
 
   try {
-
     const response = await fetch(
       LOG_SERVER_URL,
       {
         method: "POST",
 
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+
+          // Important for free ngrok tunnels
+          "ngrok-skip-browser-warning": "true"
         },
 
         body: JSON.stringify(payload)
       }
     );
 
+    console.log(
+      "Log server HTTP status:",
+      response.status
+    );
+
     if (!response.ok) {
+      const responseText =
+        await response.text();
+
       throw new Error(
-        `Server returned ${response.status}`
+        `Server returned ${response.status}: ${responseText}`
       );
     }
 
-    const result = await response.json();
+    const result =
+      await response.json();
 
     console.log(
       "Log successfully saved on laptop:",
@@ -462,7 +472,6 @@ async function sendSimulationLogToLaptop() {
     return true;
 
   } catch (error) {
-
     console.error(
       "Could not send log to laptop:",
       error
