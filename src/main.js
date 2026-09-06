@@ -1812,14 +1812,15 @@ loader.load(
     drumModel =
       model;
 
+    const shouldShowDrum =
+      simulationState === STATE.ACTIVE;
+
     drumModel.visible =
-      false;
+      shouldShowDrum;
 
     const finalBox =
       new THREE.Box3()
-        .setFromObject(
-          model
-        );
+        .setFromObject(model);
 
     const finalSize =
       finalBox.getSize(
@@ -1840,9 +1841,7 @@ loader.load(
         finalSize.z
       ) * 0.5;
 
-    scene.add(
-      model
-    );
+    scene.add(model);
 
     // Drum glow
     const drumLight =
@@ -1858,11 +1857,10 @@ loader.load(
     );
 
     drumLight.position.y +=
-      finalSize.y *
-      0.35;
+      finalSize.y * 0.35;
 
     drumLight.visible =
-      false;
+      shouldShowDrum;
 
     scene.add(
       drumLight
@@ -1881,56 +1879,35 @@ loader.load(
     );
 
     topLight.position.y =
-      drumTopY +
-      0.5;
+      drumTopY + 0.5;
 
     topLight.visible =
-      false;
+      shouldShowDrum;
 
     scene.add(
       topLight
     );
 
-    drumModel.userData
-      .drumLight =
+    drumModel.userData.drumLight =
       drumLight;
 
-    drumModel.userData
-      .topLight =
+    drumModel.userData.topLight =
       topLight;
 
-    // Desktop preview
-    setTimeout(
-      () => {
+    // If we're not in VR, show the desktop preview.
+    if (!renderer.xr.isPresenting) {
+      setDrumVisible(true);
+    }
 
-        if (
-          !renderer.xr
-            .getSession() &&
-          drumModel
-        ) {
-
-          setDrumVisible(
-            true
-          );
-        }
-
-      },
-      500
-    );
+    // If the user is already in the ACTIVE simulation,
+    // make absolutely sure the model is visible.
+    if (simulationState === STATE.ACTIVE) {
+      setDrumVisible(true);
+    }
 
     console.log(
       "GLB loaded successfully",
       gltf
-    );
-  },
-
-  undefined,
-
-  (error) => {
-
-    console.error(
-      "GLB failed to load:",
-      error
     );
   }
 );
