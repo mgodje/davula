@@ -7,7 +7,7 @@ import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFa
 
 // Server
 
-const LOG_SERVER_URL = "https://lemon-safari-unpopular.ngrok-free.dev";
+const LOG_SERVER_URL = "https://lemon-safari-unpopular.ngrok-free.app/log";
 // ============================================================
 // SCENE
 // ============================================================
@@ -1514,7 +1514,7 @@ function cancelEndSimulation(
   );
 }
 
-function confirmEndSimulation(
+async function confirmEndSimulation(
   handedness
 ) {
 
@@ -1555,10 +1555,15 @@ function confirmEndSimulation(
 
   showEndedPanel();
 
-  sendSimulationLogToLaptop();
+  const saved = await sendSimulationLogToLaptop();
 
-  simulationLogging =
-    false;
+  if (saved) {
+    console.log("Session log successfully saved to laptop.");
+  } else {
+    console.error("Session log could not be saved to laptop.");
+  }
+
+  simulationLogging = false;
 }
 
 function handleUIButtonAction(
@@ -2862,43 +2867,35 @@ renderer.xr.addEventListener(
 
 renderer.xr.addEventListener(
   "sessionend",
-  () => {
+  async () => {
 
     clearUIPanel();
 
-    controlsEnabled =
-      false;
+    controlsEnabled = false;
 
     if (
       simulationLogging &&
-      simulationState !==
-        STATE.ENDED
+      simulationState !== STATE.ENDED
     ) {
 
       logEvent(
         "simulation_end",
         {
-
-          reason:
-            "xr_session_closed",
-
+          reason: "xr_session_closed",
           ...getWorldState()
         }
       );
 
-      downloadSimulationLog();
+      // Send log to laptop instead of downloading on Quest
+      await sendSimulationLogToLaptop();
 
-      simulationLogging =
-        false;
+      simulationLogging = false;
     }
 
     simulationState =
       STATE.WAITING_FOR_VR;
 
-    // Desktop preview
-    setDrumVisible(
-      true
-    );
+    setDrumVisible(true);
   }
 );
 

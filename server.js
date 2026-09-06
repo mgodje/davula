@@ -4,27 +4,37 @@ import fs from "fs";
 import path from "path";
 
 const app = express();
-
 const PORT = 3001;
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-const logsDirectory = path.join(process.cwd(), "logs");
+const logsDirectory = path.join(
+  process.cwd(),
+  "logs"
+);
 
 if (!fs.existsSync(logsDirectory)) {
   fs.mkdirSync(logsDirectory);
 }
 
+app.get("/", (req, res) => {
+  res.send("Davula log server is running!");
+});
+
 app.post("/log", (req, res) => {
   try {
+
+    console.log("Received log from VR headset.");
+
     const log = req.body;
 
     const timestamp = new Date()
       .toISOString()
       .replace(/[:.]/g, "-");
 
-    const filename = `davula-session-${timestamp}.json`;
+    const filename =
+      `davula-session-${timestamp}.json`;
 
     const filePath = path.join(
       logsDirectory,
@@ -46,13 +56,15 @@ app.post("/log", (req, res) => {
     });
 
   } catch (error) {
+
     console.error(
       "Could not save log:",
       error
     );
 
     res.status(500).json({
-      success: false
+      success: false,
+      error: error.message
     });
   }
 });
