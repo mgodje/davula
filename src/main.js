@@ -7,7 +7,8 @@ import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFa
 
 // Server
 
-const LOG_SERVER_URL = "https://lemon-safari-unpopular.ngrok-free.app/log";
+const LOG_SERVER_URL = "https://lemon-safari-unpopular.ngrok-free.dev/log";
+
 // ============================================================
 // SCENE
 // ============================================================
